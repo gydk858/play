@@ -1,15 +1,16 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
+import { readFile } from 'fs/promises';
+import path from 'path';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 type ItoTopic = {
   id: number;
@@ -63,6 +64,129 @@ function createScaleNote(topic: ItoTopic) {
   return '1 - 100';
 }
 
+async function makeColoredTextImage({
+  text,
+  font,
+  fontfile,
+  width,
+  dpi,
+  align = 'left',
+  color = '#000000',
+}: {
+  text: string;
+  font: string;
+  fontfile: string;
+  width: number;
+  dpi: number;
+  align?: 'left' | 'center' | 'right';
+  color?: string;
+}) {
+  const textMask = await sharp({
+    text: {
+      text,
+      font,
+      fontfile,
+      width,
+      rgba: true,
+      dpi,
+      align,
+    },
+  })
+    .png()
+    .ensureAlpha()
+    .toBuffer();
+
+  const meta = await sharp(textMask).metadata();
+  const w = meta.width ?? width;
+  const h = meta.height ?? 60;
+
+  const colorImage = await sharp({
+    create: {
+      width: w,
+      height: h,
+      channels: 4,
+      background: color,
+    },
+  })
+    .png()
+    .toBuffer();
+
+  return await sharp(colorImage)
+    .composite([
+      {
+        input: textMask,
+        blend: 'dest-in',
+      },
+    ])
+    .png()
+    .toBuffer();
+}
+
+async function mergeLineImagesCentered(
+  lines: string[],
+  options: {
+    font: string;
+    fontfile: string;
+    width: number;
+    dpi: number;
+    color: string;
+    gap: number;
+  }
+) {
+  if (lines.length === 0) {
+    return null;
+  }
+
+  const lineBuffers = await Promise.all(
+    lines.map((line) =>
+      makeColoredTextImage({
+        text: line || ' ',
+        font: options.font,
+        fontfile: options.fontfile,
+        width: options.width,
+        dpi: options.dpi,
+        align: 'center',
+        color: options.color,
+      })
+    )
+  );
+
+  const metas = await Promise.all(
+    lineBuffers.map((buffer) => sharp(buffer).metadata())
+  );
+
+  const totalHeight =
+    metas.reduce((sum, meta) => sum + (meta.height ?? 0), 0) +
+    options.gap * Math.max(0, lineBuffers.length - 1);
+
+  const canvas = sharp({
+    create: {
+      width: options.width,
+      height: totalHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  });
+
+  let currentTop = 0;
+  const composites = lineBuffers.map((buffer, index) => {
+    const meta = metas[index];
+    const w = meta.width ?? options.width;
+    const h = meta.height ?? 0;
+    const left = Math.max(0, Math.round((options.width - w) / 2));
+    const top = currentTop;
+    currentTop += h + options.gap;
+
+    return {
+      input: buffer,
+      left,
+      top,
+    };
+  });
+
+  return await canvas.composite(composites).png().toBuffer();
+}
+
 async function getTopicById(topicId: number) {
   const { data, error } = await supabase
     .from('ito_topics')
@@ -91,9 +215,9 @@ async function getRandomActiveTopic() {
   return topics[Math.floor(Math.random() * topics.length)];
 }
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const url = new URL(request.url);
+    const url = new URL(req.url);
     const topicIdParam = url.searchParams.get('topic_id');
     const topicId = topicIdParam ? Number(topicIdParam) : null;
 
@@ -115,12 +239,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const fontPath = path.join(
-      process.cwd(),
-      'public',
-      'fonts',
-      'NotoSansJP-Bold.ttf'
-    );
     const baseImagePath = path.join(
       process.cwd(),
       'public',
@@ -130,124 +248,92 @@ export async function GET(request: Request) {
       'topic-base.png'
     );
 
-    const [fontData, baseImageBuffer] = await Promise.all([
-      fs.readFile(fontPath),
-      fs.readFile(baseImagePath),
-    ]);
+    const fontPath = path.join(
+      process.cwd(),
+      'public',
+      'fonts',
+      'NotoSansJP-Bold.ttf'
+    );
 
-    const baseImageBase64 = baseImageBuffer.toString('base64');
-    const backgroundSrc = `data:image/png;base64,${baseImageBase64}`;
+    await readFile(fontPath);
+
+    const baseImageBuffer = await readFile(baseImagePath);
+    const baseImage = sharp(baseImageBuffer);
 
     const titleLines = buildLines(topic.title, 9);
     const noteText = createScaleNote(topic);
 
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: 1060,
-            height: 1484,
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'stretch',
-            justifyContent: 'stretch',
-            backgroundColor: '#ffffff',
-          }}
-        >
-          <img
-            src={backgroundSrc}
-            alt=""
-            width={1060}
-            height={1484}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-            }}
-          />
+    const titleTextImage = await mergeLineImagesCentered(titleLines, {
+      font: 'Noto Sans JP',
+      fontfile: fontPath,
+      width: 760,
+      dpi: 180,
+      color: '#ffffff',
+      gap: 10,
+    });
 
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingTop: 420,
-            }}
-          >
-            <div
-              style={{
-                width: 760,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                color: '#ffffff',
-                fontSize: 74,
-                fontWeight: 700,
-                lineHeight: 1.3,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {titleLines.map((line, index) => (
-                <div key={index}>{line}</div>
-              ))}
-            </div>
-          </div>
+    const titleShadowImage = await mergeLineImagesCentered(titleLines, {
+      font: 'Noto Sans JP',
+      fontfile: fontPath,
+      width: 760,
+      dpi: 180,
+      color: 'rgba(0, 0, 0, 0.18)',
+      gap: 10,
+    });
 
-          <div
-            style={{
-              position: 'absolute',
-              left: 120,
-              right: 120,
-              bottom: 180,
-              display: 'flex',
-              justifyContent: 'center',
-              textAlign: 'center',
-              color: '#f4d35e',
-              fontSize: 28,
-              fontWeight: 700,
-              lineHeight: 1.4,
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {noteText}
-          </div>
-        </div>
-      ),
+    const noteTextImage = await makeColoredTextImage({
+      text: noteText,
+      font: 'Noto Sans JP',
+      fontfile: fontPath,
+      width: 760,
+      dpi: 110,
+      align: 'center',
+      color: '#f4d35e',
+    });
+
+    const noteShadowImage = await makeColoredTextImage({
+      text: noteText,
+      font: 'Noto Sans JP',
+      fontfile: fontPath,
+      width: 760,
+      dpi: 110,
+      align: 'center',
+      color: 'rgba(0, 0, 0, 0.18)',
+    });
+
+    const resultBuffer = await baseImage
+      .composite([
+        ...(titleShadowImage
+          ? [{ input: titleShadowImage, left: 152, top: 422 }]
+          : []),
+        ...(titleTextImage ? [{ input: titleTextImage, left: 150, top: 420 }] : []),
+
+        { input: noteShadowImage, left: 152, top: 1182 },
+        { input: noteTextImage, left: 150, top: 1180 },
+      ])
+      .png()
+      .toBuffer();
+
+    return new Response(new Uint8Array(resultBuffer), {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    });
+  } catch (error) {
+    return new Response(
+      `Topic route error: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
       {
-        width: 1060,
-        height: 1484,
-        fonts: [
-          {
-            name: 'Noto Sans JP',
-            data: fontData,
-            weight: 700,
-            style: 'normal',
-          },
-        ],
+        status: 500,
         headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control':
-            'no-store, no-cache, must-revalidate, proxy-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store',
         },
       }
     );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown topic route error';
-
-    return new Response(`Topic route error: ${message}`, {
-      status: 500,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store',
-      },
-    });
   }
 }
