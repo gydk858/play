@@ -64,7 +64,9 @@ export async function GET() {
     .png()
     .toBuffer();
 
-  return new Response(outputBuffer, {
+  const body = new Uint8Array(outputBuffer);
+
+  return new Response(body, {
     headers: {
       'Content-Type': 'image/png',
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
