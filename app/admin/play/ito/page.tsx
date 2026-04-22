@@ -185,6 +185,8 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
   const topicUrl = `${baseUrl}/play/ito/topic`;
   const numberUrl = `${baseUrl}/play/ito/number`;
 
+  const previewToken = Date.now();
+
   const supabase = createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -414,7 +416,7 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
                 <div style={previewAreaStyle}>
                   <div style={previewTitleStyle}>プレビュー</div>
                   <img
-                    src={`/play/ito/topic?topic_id=${topic.id}&preview=${topic.created_at}`}
+                    src={`/play/ito/topic?topic_id=${topic.id}&preview=${previewToken}-${topic.id}`}
                     alt={`${topic.title} のプレビュー`}
                     style={previewImageStyle}
                   />

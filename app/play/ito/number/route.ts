@@ -1,142 +1,120 @@
-import sharp from 'sharp';
-import { readFile } from 'fs/promises';
+import fs from 'fs/promises';
 import path from 'path';
+import { ImageResponse } from 'next/og';
+import { createElement } from 'react';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
-async function makeColoredTextImage({
-  text,
-  font,
-  fontfile,
-  width,
-  dpi,
-  align = 'left',
-  color = '#000000',
-}: {
-  text: string;
-  font: string;
-  fontfile: string;
-  width: number;
-  dpi: number;
-  align?: 'left' | 'center' | 'right';
-  color?: string;
-}) {
-  const textMask = await sharp({
-    text: {
-      text,
-      font,
-      fontfile,
-      width,
-      rgba: true,
-      dpi,
-      align,
-    },
-  })
-    .png()
-    .ensureAlpha()
-    .toBuffer();
+function getNumberFontSize(number: number) {
+  if (number >= 10) {
+    return 460;
+  }
 
-  const meta = await sharp(textMask).metadata();
-  const w = meta.width ?? width;
-  const h = meta.height ?? 60;
-
-  const colorImage = await sharp({
-    create: {
-      width: w,
-      height: h,
-      channels: 4,
-      background: color,
-    },
-  })
-    .png()
-    .toBuffer();
-
-  return await sharp(colorImage)
-    .composite([
-      {
-        input: textMask,
-        blend: 'dest-in',
-      },
-    ])
-    .png()
-    .toBuffer();
+  return 540;
 }
 
 export async function GET() {
   try {
-    const number = Math.floor(Math.random() * 13) + 1;
+    const number = Math.floor(Math.random() * 99) + 1;
 
-    const baseImagePath = path.join(
-      process.cwd(),
-      'public',
-      'play',
-      'ito',
-      'templates',
-      'number-base.png'
+    const [fontData, backgroundBuffer] = await Promise.all([
+      fs.readFile(
+        path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Bold.ttf')
+      ),
+      fs.readFile(
+        path.join(
+          process.cwd(),
+          'public',
+          'play',
+          'ito',
+          'templates',
+          'number-base.png'
+        )
+      ),
+    ]);
+
+    const backgroundBase64 = backgroundBuffer.toString('base64');
+    const fontSize = getNumberFontSize(number);
+
+    const tree = createElement(
+      'div',
+      {
+        style: {
+          width: '1060px',
+          height: '1484px',
+          display: 'flex',
+          position: 'relative',
+          backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+        },
+      },
+      createElement(
+        'div',
+        {
+          style: {
+            position: 'absolute',
+            left: '0',
+            right: '0',
+            top: '260px',
+            height: '520px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+          },
+        },
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#1f2937',
+              fontSize: `${fontSize}px`,
+              fontFamily: 'NotoSansJP',
+              fontWeight: 700,
+              lineHeight: 1,
+              textAlign: 'center',
+            },
+          },
+          String(number)
+        )
+      )
     );
 
-    const fontPath = path.join(
-      process.cwd(),
-      'public',
-      'fonts',
-      'NotoSansJP-Bold.ttf'
-    );
-
-    await readFile(fontPath);
-
-    const baseImageBuffer = await readFile(baseImagePath);
-    const baseImage = sharp(baseImageBuffer);
-
-    const numberTextImage = await makeColoredTextImage({
-      text: String(number),
-      font: 'Noto Sans JP',
-      fontfile: fontPath,
-      width: 700,
-      dpi: 320,
-      align: 'center',
-      color: '#1f2937',
-    });
-
-    const numberShadowImage = await makeColoredTextImage({
-      text: String(number),
-      font: 'Noto Sans JP',
-      fontfile: fontPath,
-      width: 700,
-      dpi: 320,
-      align: 'center',
-      color: 'rgba(0, 0, 0, 0.12)',
-    });
-
-    const resultBuffer = await baseImage
-      .composite([
-        { input: numberShadowImage, left: 182, top: 470 },
-        { input: numberTextImage, left: 180, top: 468 },
-      ])
-      .png()
-      .toBuffer();
-
-    return new Response(new Uint8Array(resultBuffer), {
+    return new ImageResponse(tree, {
+      width: 1060,
+      height: 1484,
+      fonts: [
+        {
+          name: 'NotoSansJP',
+          data: fontData,
+          style: 'normal',
+          weight: 700,
+        },
+      ],
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
         Pragma: 'no-cache',
         Expires: '0',
       },
     });
   } catch (error) {
-    return new Response(
-      `Number route error: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Cache-Control': 'no-store',
-        },
-      }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Unknown number route error';
+
+    return new Response(`Number route error: ${message}`, {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
   }
 }
