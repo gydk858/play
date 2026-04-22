@@ -32,6 +32,75 @@ function createScaleNote(topic: ItoTopic) {
   return '1 - 100';
 }
 
+function splitTextByLength(text: string, maxCharsPerLine: number) {
+  const normalized = text.replace(/\r\n/g, '\n').trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const paragraphs = normalized.split('\n');
+  const lines: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    if (!paragraph) {
+      lines.push('');
+      continue;
+    }
+
+    let current = '';
+
+    for (const char of paragraph) {
+      if (current.length >= maxCharsPerLine) {
+        lines.push(current);
+        current = char;
+      } else {
+        current += char;
+      }
+    }
+
+    if (current) {
+      lines.push(current);
+    }
+  }
+
+  return lines;
+}
+
+function getTitleLayout(title: string) {
+  const length = title.replace(/\s+/g, '').length;
+
+  if (length <= 8) {
+    return {
+      fontSize: 92,
+      lineHeight: 1.18,
+      maxCharsPerLine: 8,
+    };
+  }
+
+  if (length <= 14) {
+    return {
+      fontSize: 80,
+      lineHeight: 1.2,
+      maxCharsPerLine: 7,
+    };
+  }
+
+  if (length <= 20) {
+    return {
+      fontSize: 68,
+      lineHeight: 1.22,
+      maxCharsPerLine: 6,
+    };
+  }
+
+  return {
+    fontSize: 58,
+    lineHeight: 1.24,
+    maxCharsPerLine: 6,
+  };
+}
+
 async function getTopicById(topicId: number) {
   const { data, error } = await supabase
     .from('ito_topics')
@@ -111,6 +180,12 @@ export async function GET(request: Request) {
     const backgroundBase64 = backgroundBuffer.toString('base64');
     const noteText = createScaleNote(topic);
 
+    const titleLayout = getTitleLayout(topic.title);
+    const titleLines = splitTextByLength(
+      topic.title,
+      titleLayout.maxCharsPerLine
+    );
+
     return new ImageResponse(
       (
         <div
@@ -128,49 +203,67 @@ export async function GET(request: Request) {
           <div
             style={{
               position: 'absolute',
-              inset: 0,
+              left: '120px',
+              right: '120px',
+              top: '250px',
+              height: '420px',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: '330px',
-              paddingBottom: '180px',
-              paddingLeft: '110px',
-              paddingRight: '110px',
+              justifyContent: 'center',
               textAlign: 'center',
             }}
           >
             <div
               style={{
                 display: 'flex',
-                color: '#ffffff',
-                fontSize: 74,
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                maxWidth: '100%',
+              }}
+            >
+              {titleLines.map((line, index) => (
+                <div
+                  key={`${line}-${index}`}
+                  style={{
+                    display: 'block',
+                    color: '#ffffff',
+                    fontSize: `${titleLayout.fontSize}px`,
+                    fontFamily: 'NotoSansJP',
+                    fontWeight: 700,
+                    lineHeight: titleLayout.lineHeight,
+                    textAlign: 'center',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              position: 'absolute',
+              left: '140px',
+              right: '140px',
+              bottom: '115px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                display: 'block',
+                color: '#f4d35e',
+                fontSize: '28px',
                 fontFamily: 'NotoSansJP',
                 fontWeight: 700,
                 lineHeight: 1.3,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                maxWidth: '100%',
-                justifyContent: 'center',
                 textAlign: 'center',
-              }}
-            >
-              {topic.title}
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                color: '#f4d35e',
-                fontSize: 28,
-                fontFamily: 'NotoSansJP',
-                fontWeight: 700,
-                lineHeight: 1.4,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
                 maxWidth: '100%',
-                justifyContent: 'center',
-                textAlign: 'center',
               }}
             >
               {noteText}
