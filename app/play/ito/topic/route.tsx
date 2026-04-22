@@ -117,24 +117,14 @@ export async function GET(request: Request) {
           style={{
             width: '1060px',
             height: '1484px',
-            position: 'relative',
             display: 'flex',
-            alignItems: 'stretch',
-            justifyContent: 'stretch',
-            backgroundColor: '#ffffff',
+            position: 'relative',
+            backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
           }}
         >
-          <img
-            src={`data:image/png;base64,${backgroundBase64}`}
-            alt=""
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-            }}
-          />
-
           <div
             style={{
               position: 'absolute',
@@ -161,6 +151,8 @@ export async function GET(request: Request) {
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 maxWidth: '100%',
+                justifyContent: 'center',
+                textAlign: 'center',
               }}
             >
               {topic.title}
@@ -174,10 +166,11 @@ export async function GET(request: Request) {
                 fontFamily: 'NotoSansJP',
                 fontWeight: 700,
                 lineHeight: 1.4,
-                textAlign: 'center',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 maxWidth: '100%',
+                justifyContent: 'center',
+                textAlign: 'center',
               }}
             >
               {noteText}
