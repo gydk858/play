@@ -83,6 +83,17 @@ function createScaleNote(topic: ItoTopic) {
   return '1 - 100';
 }
 
+function createEmbeddedFontCss(fontBase64: string) {
+  return `
+    @font-face {
+      font-family: 'NotoSansJPEmbedded';
+      src: url("data:font/ttf;base64,${fontBase64}") format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+  `;
+}
+
 async function getTopicById(topicId: number) {
   const { data, error } = await supabase
     .from('ito_topics')
@@ -152,7 +163,20 @@ export async function GET(request: Request) {
       'topic-base.png'
     );
 
-    const baseImageBuffer = await fs.readFile(baseImagePath);
+    const fontPath = path.join(
+      process.cwd(),
+      'public',
+      'fonts',
+      'NotoSansJP-Bold.ttf'
+    );
+
+    const [baseImageBuffer, fontBuffer] = await Promise.all([
+      fs.readFile(baseImagePath),
+      fs.readFile(fontPath),
+    ]);
+
+    const fontBase64 = fontBuffer.toString('base64');
+
     const metadata = await sharp(baseImageBuffer).metadata();
 
     const width = metadata.width ?? 1060;
@@ -183,17 +207,20 @@ export async function GET(request: Request) {
     const svgText = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <style>
+          ${createEmbeddedFontCss(fontBase64)}
+
           .title {
             font-size: ${titleFontSize}px;
             font-weight: 700;
             fill: #ffffff;
-            font-family: "Arial", "Helvetica", sans-serif;
+            font-family: 'NotoSansJPEmbedded', sans-serif;
           }
+
           .note {
             font-size: ${noteFontSize}px;
             font-weight: 700;
             fill: #f4d35e;
-            font-family: "Arial", "Helvetica", sans-serif;
+            font-family: 'NotoSansJPEmbedded', sans-serif;
           }
         </style>
 
