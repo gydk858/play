@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
+import { createElement } from 'react';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -186,111 +187,121 @@ export async function GET(request: Request) {
       titleLayout.maxCharsPerLine
     );
 
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: '1060px',
-            height: '1484px',
-            display: 'flex',
-            position: 'relative',
-            backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'center',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: '110px',
-              right: '110px',
-              top: '220px',
-              height: '470px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                maxWidth: '100%',
-              }}
-            >
-              {titleLines.map((line, index) => (
-                <div
-                  key={`${line}-${index}`}
-                  style={{
-                    display: 'block',
-                    color: '#ffffff',
-                    fontSize: `${titleLayout.fontSize}px`,
-                    fontFamily: 'NotoSansJP',
-                    fontWeight: 700,
-                    lineHeight: titleLayout.lineHeight,
-                    textAlign: 'center',
-                    maxWidth: '100%',
-                  }}
-                >
-                  {line}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              position: 'absolute',
-              left: '140px',
-              right: '140px',
-              bottom: '115px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                display: 'block',
-                color: '#f4d35e',
-                fontSize: '28px',
-                fontFamily: 'NotoSansJP',
-                fontWeight: 700,
-                lineHeight: 1.3,
-                textAlign: 'center',
-                maxWidth: '100%',
-              }}
-            >
-              {noteText}
-            </div>
-          </div>
-        </div>
-      ),
-      {
-        width: 1060,
-        height: 1484,
-        fonts: [
-          {
-            name: 'NotoSansJP',
-            data: fontData,
-            style: 'normal',
-            weight: 700,
+    const titleLineNodes = titleLines.map((line, index) =>
+      createElement(
+        'div',
+        {
+          key: `title-${index}`,
+          style: {
+            display: 'block',
+            color: '#ffffff',
+            fontSize: `${titleLayout.fontSize}px`,
+            fontFamily: 'NotoSansJP',
+            fontWeight: 700,
+            lineHeight: titleLayout.lineHeight,
+            textAlign: 'center',
+            maxWidth: '100%',
           },
-        ],
-        headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control':
-            'no-store, no-cache, must-revalidate, proxy-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
         },
-      }
+        line
+      )
     );
+
+    const tree = createElement(
+      'div',
+      {
+        style: {
+          width: '1060px',
+          height: '1484px',
+          display: 'flex',
+          position: 'relative',
+          backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+        },
+      },
+      createElement(
+        'div',
+        {
+          style: {
+            position: 'absolute',
+            left: '110px',
+            right: '110px',
+            top: '220px',
+            height: '470px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+          },
+        },
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              maxWidth: '100%',
+            },
+          },
+          ...titleLineNodes
+        )
+      ),
+      createElement(
+        'div',
+        {
+          style: {
+            position: 'absolute',
+            left: '140px',
+            right: '140px',
+            bottom: '115px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+          },
+        },
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'block',
+              color: '#f4d35e',
+              fontSize: '28px',
+              fontFamily: 'NotoSansJP',
+              fontWeight: 700,
+              lineHeight: 1.3,
+              textAlign: 'center',
+              maxWidth: '100%',
+            },
+          },
+          noteText
+        )
+      )
+    );
+
+    return new ImageResponse(tree, {
+      width: 1060,
+      height: 1484,
+      fonts: [
+        {
+          name: 'NotoSansJP',
+          data: fontData,
+          style: 'normal',
+          weight: 700,
+        },
+      ],
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown topic route error';
