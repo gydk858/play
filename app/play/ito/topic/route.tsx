@@ -72,31 +72,31 @@ function getTitleLayout(title: string) {
 
   if (length <= 8) {
     return {
-      fontSize: 92,
-      lineHeight: 1.18,
+      fontSize: 108,
+      lineHeight: 1.16,
       maxCharsPerLine: 8,
     };
   }
 
   if (length <= 14) {
     return {
-      fontSize: 80,
-      lineHeight: 1.2,
+      fontSize: 94,
+      lineHeight: 1.18,
       maxCharsPerLine: 7,
     };
   }
 
   if (length <= 20) {
     return {
-      fontSize: 68,
-      lineHeight: 1.22,
+      fontSize: 78,
+      lineHeight: 1.2,
       maxCharsPerLine: 6,
     };
   }
 
   return {
-    fontSize: 58,
-    lineHeight: 1.24,
+    fontSize: 66,
+    lineHeight: 1.22,
     maxCharsPerLine: 6,
   };
 }
@@ -203,10 +203,10 @@ export async function GET(request: Request) {
           <div
             style={{
               position: 'absolute',
-              left: '120px',
-              right: '120px',
-              top: '250px',
-              height: '420px',
+              left: '110px',
+              right: '110px',
+              top: '220px',
+              height: '470px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
