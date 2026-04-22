@@ -64,6 +64,46 @@ function createScaleNote(topic: ItoTopic) {
   return '1 - 100';
 }
 
+function getTitleLayout(lineCount: number) {
+  if (lineCount <= 1) {
+    return {
+      width: 860,
+      left: 100,
+      top: 290,
+      dpi: 430,
+      gap: 22,
+    };
+  }
+
+  if (lineCount === 2) {
+    return {
+      width: 860,
+      left: 100,
+      top: 280,
+      dpi: 390,
+      gap: 20,
+    };
+  }
+
+  if (lineCount === 3) {
+    return {
+      width: 860,
+      left: 100,
+      top: 255,
+      dpi: 345,
+      gap: 18,
+    };
+  }
+
+  return {
+    width: 860,
+    left: 100,
+    top: 235,
+    dpi: 310,
+    gap: 16,
+  };
+}
+
 async function makeColoredTextImage({
   text,
   font,
@@ -261,55 +301,71 @@ export async function GET(req: Request) {
     const baseImage = sharp(baseImageBuffer);
 
     const titleLines = buildLines(topic.title, 9);
-    const noteText = createScaleNote(topic);
+    const noteLines = buildLines(createScaleNote(topic), 22);
+
+    const titleLayout = getTitleLayout(titleLines.length);
 
     const titleTextImage = await mergeLineImagesCentered(titleLines, {
       font: 'Noto Sans JP',
       fontfile: fontPath,
-      width: 760,
-      dpi: 180,
+      width: titleLayout.width,
+      dpi: titleLayout.dpi,
       color: '#ffffff',
-      gap: 10,
+      gap: titleLayout.gap,
     });
 
     const titleShadowImage = await mergeLineImagesCentered(titleLines, {
       font: 'Noto Sans JP',
       fontfile: fontPath,
-      width: 760,
-      dpi: 180,
+      width: titleLayout.width,
+      dpi: titleLayout.dpi,
       color: 'rgba(0, 0, 0, 0.18)',
-      gap: 10,
+      gap: titleLayout.gap,
     });
 
-    const noteTextImage = await makeColoredTextImage({
-      text: noteText,
+    const noteTextImage = await mergeLineImagesCentered(noteLines, {
       font: 'Noto Sans JP',
       fontfile: fontPath,
-      width: 760,
-      dpi: 110,
-      align: 'center',
+      width: 820,
+      dpi: 190,
       color: '#f4d35e',
+      gap: 8,
     });
 
-    const noteShadowImage = await makeColoredTextImage({
-      text: noteText,
+    const noteShadowImage = await mergeLineImagesCentered(noteLines, {
       font: 'Noto Sans JP',
       fontfile: fontPath,
-      width: 760,
-      dpi: 110,
-      align: 'center',
+      width: 820,
+      dpi: 190,
       color: 'rgba(0, 0, 0, 0.18)',
+      gap: 8,
     });
 
     const resultBuffer = await baseImage
       .composite([
         ...(titleShadowImage
-          ? [{ input: titleShadowImage, left: 152, top: 422 }]
+          ? [
+              {
+                input: titleShadowImage,
+                left: titleLayout.left + 2,
+                top: titleLayout.top + 2,
+              },
+            ]
           : []),
-        ...(titleTextImage ? [{ input: titleTextImage, left: 150, top: 420 }] : []),
+        ...(titleTextImage
+          ? [
+              {
+                input: titleTextImage,
+                left: titleLayout.left,
+                top: titleLayout.top,
+              },
+            ]
+          : []),
 
-        { input: noteShadowImage, left: 152, top: 1182 },
-        { input: noteTextImage, left: 150, top: 1180 },
+        ...(noteShadowImage
+          ? [{ input: noteShadowImage, left: 122, top: 1178 }]
+          : []),
+        ...(noteTextImage ? [{ input: noteTextImage, left: 120, top: 1176 }] : []),
       ])
       .png()
       .toBuffer();
