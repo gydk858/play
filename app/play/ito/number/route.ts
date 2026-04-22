@@ -1,33 +1,20 @@
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
+import { ImageResponse } from 'next/og';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function escapeXml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function createEmbeddedFontCss(fontBase64: string) {
-  return `
-    @font-face {
-      font-family: 'NotoSansJPEmbedded';
-      src: url("data:font/ttf;base64,${fontBase64}") format('truetype');
-      font-weight: 700;
-      font-style: normal;
-    }
-  `;
-}
 
 export async function GET() {
   try {
     const number = Math.floor(Math.random() * 13) + 1;
 
+    const fontPath = path.join(
+      process.cwd(),
+      'public',
+      'fonts',
+      'NotoSansJP-Bold.ttf'
+    );
     const baseImagePath = path.join(
       process.cwd(),
       'public',
@@ -37,71 +24,77 @@ export async function GET() {
       'number-base.png'
     );
 
-    const fontPath = path.join(
-      process.cwd(),
-      'public',
-      'fonts',
-      'NotoSansJP-Bold.ttf'
-    );
-
-    const [baseImageBuffer, fontBuffer] = await Promise.all([
-      fs.readFile(baseImagePath),
+    const [fontData, baseImageBuffer] = await Promise.all([
       fs.readFile(fontPath),
+      fs.readFile(baseImagePath),
     ]);
 
-    const fontBase64 = fontBuffer.toString('base64');
+    const baseImageBase64 = baseImageBuffer.toString('base64');
+    const backgroundSrc = `data:image/png;base64,${baseImageBase64}`;
 
-    const metadata = await sharp(baseImageBuffer).metadata();
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: 1060,
+            height: 1484,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'stretch',
+            justifyContent: 'stretch',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <img
+            src={backgroundSrc}
+            alt=""
+            width={1060}
+            height={1484}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+            }}
+          />
 
-    const width = metadata.width ?? 1060;
-    const height = metadata.height ?? 1484;
-
-    const fontSize = Math.round(width * 0.34);
-
-    const svgText = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <style>
-          ${createEmbeddedFontCss(fontBase64)}
-
-          .number {
-            font-size: ${fontSize}px;
-            font-weight: 700;
-            fill: #1f2937;
-            font-family: 'NotoSansJPEmbedded', sans-serif;
-          }
-        </style>
-
-        <text
-          x="50%"
-          y="50%"
-          text-anchor="middle"
-          dominant-baseline="middle"
-          class="number"
-        >${escapeXml(String(number))}</text>
-      </svg>
-    `;
-
-    const outputBuffer = await sharp(baseImageBuffer)
-      .composite([
-        {
-          input: Buffer.from(svgText),
-          top: 0,
-          left: 0,
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#1f2937',
+              fontSize: 360,
+              fontWeight: 700,
+              lineHeight: 1,
+            }}
+          >
+            {String(number)}
+          </div>
+        </div>
+      ),
+      {
+        width: 1060,
+        height: 1484,
+        fonts: [
+          {
+            name: 'Noto Sans JP',
+            data: fontData,
+            weight: 700,
+            style: 'normal',
+          },
+        ],
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control':
+            'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
-      ])
-      .png()
-      .toBuffer();
-
-    const body = new Uint8Array(outputBuffer);
-
-    return new Response(body, {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-      },
-    });
+      }
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown number route error';
