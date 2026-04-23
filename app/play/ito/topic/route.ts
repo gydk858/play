@@ -1,291 +1,32 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { ImageResponse } from 'next/og';
-import { createClient } from '@supabase/supabase-js';
-import { createElement } from 'react';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-type ItoTopic = {
-  id: number;
-  title: string;
-  description: string | null;
-  label_low: string | null;
-  label_high: string | null;
-  is_active: boolean;
-  created_at: string;
-};
-
-function createScaleNote(topic: ItoTopic) {
-  const low = (topic.label_low ?? '').trim();
-  const high = (topic.label_high ?? '').trim();
-
-  if (low && high) {
-    return `${low}  1 - 100  ${high}`;
-  }
-
-  return '1 - 100';
-}
-
-function splitTextByLength(text: string, maxCharsPerLine: number) {
-  const normalized = text.replace(/\r\n/g, '\n').trim();
-
-  if (!normalized) return [];
-
-  const paragraphs = normalized.split('\n');
-  const lines: string[] = [];
-
-  for (const paragraph of paragraphs) {
-    if (!paragraph) {
-      lines.push('');
-      continue;
-    }
-
-    let current = '';
-
-    for (const char of paragraph) {
-      if (current.length >= maxCharsPerLine) {
-        lines.push(current);
-        current = char;
-      } else {
-        current += char;
-      }
-    }
-
-    if (current) {
-      lines.push(current);
-    }
-  }
-
-  return lines;
-}
-
-function getTitleLayout(title: string) {
-  const length = title.replace(/\s+/g, '').length;
-
-  if (length <= 8) {
-    return { fontSize: 108, lineHeight: 1.16, maxCharsPerLine: 8 };
-  }
-
-  if (length <= 14) {
-    return { fontSize: 94, lineHeight: 1.18, maxCharsPerLine: 7 };
-  }
-
-  if (length <= 20) {
-    return { fontSize: 78, lineHeight: 1.2, maxCharsPerLine: 6 };
-  }
-
-  return { fontSize: 66, lineHeight: 1.22, maxCharsPerLine: 6 };
-}
-
-async function getTopicById(topicId: number) {
-  const { data, error } = await supabase
-    .from('ito_topics')
-    .select(
-      'id, title, description, label_low, label_high, is_active, created_at'
-    )
-    .eq('id', topicId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as ItoTopic | null;
-}
-
-async function getRandomActiveTopic() {
-  const { data, error } = await supabase
-    .from('ito_topics')
-    .select(
-      'id, title, description, label_low, label_high, is_active, created_at'
-    )
-    .eq('is_active', true);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data || data.length === 0) {
-    return null;
-  }
-
-  const topics = data as ItoTopic[];
-  return topics[Math.floor(Math.random() * topics.length)];
-}
-
 export async function GET(request: Request) {
   try {
-    console.log('[ito topic] request', new Date().toISOString(), request.url);
-
-    const url = new URL(request.url);
-    const topicIdParam = url.searchParams.get('topic_id');
-    const topicId = topicIdParam ? Number(topicIdParam) : null;
-
-    let topic: ItoTopic | null = null;
-
-    if (topicId && Number.isFinite(topicId)) {
-      topic = await getTopicById(topicId);
-    } else {
-      topic = await getRandomActiveTopic();
-    }
-
-    if (!topic) {
-      return new Response('Topic not found', {
-        status: 404,
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Cache-Control': 'no-store',
-        },
-      });
-    }
-
-    const [fontData, backgroundBuffer] = await Promise.all([
-      fs.readFile(
-        path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Bold.ttf')
-      ),
-      fs.readFile(
-        path.join(
-          process.cwd(),
-          'public',
-          'play',
-          'ito',
-          'templates',
-          'topic-base.png'
-        )
-      ),
-    ]);
-
-    const backgroundBase64 = backgroundBuffer.toString('base64');
-    const noteText = createScaleNote(topic);
-
-    const titleLayout = getTitleLayout(topic.title);
-    const titleLines = splitTextByLength(
-      topic.title,
-      titleLayout.maxCharsPerLine
+    console.log(
+      '[ito topic fixed png] request',
+      new Date().toISOString(),
+      request.url
     );
 
-    const titleLineNodes = titleLines.map((line, index) =>
-      createElement(
-        'div',
-        {
-          key: `title-${index}`,
-          style: {
-            display: 'block',
-            color: '#ffffff',
-            fontSize: `${titleLayout.fontSize}px`,
-            fontFamily: 'NotoSansJP',
-            fontWeight: 700,
-            lineHeight: titleLayout.lineHeight,
-            textAlign: 'center',
-            maxWidth: '100%',
-          },
-        },
-        line
-      )
+    const imagePath = path.join(
+      process.cwd(),
+      'public',
+      'play',
+      'ito',
+      'templates',
+      'topic-base.png'
     );
 
-    const tree = createElement(
-      'div',
-      {
-        style: {
-          width: '1060px',
-          height: '1484px',
-          display: 'flex',
-          position: 'relative',
-          backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-        },
-      },
-      createElement(
-        'div',
-        {
-          style: {
-            position: 'absolute',
-            left: '110px',
-            right: '110px',
-            top: '220px',
-            height: '470px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-          },
-        },
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              maxWidth: '100%',
-            },
-          },
-          ...titleLineNodes
-        )
-      ),
-      createElement(
-        'div',
-        {
-          style: {
-            position: 'absolute',
-            left: '140px',
-            right: '140px',
-            bottom: '115px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-          },
-        },
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'block',
-              color: '#f4d35e',
-              fontSize: '28px',
-              fontFamily: 'NotoSansJP',
-              fontWeight: 700,
-              lineHeight: 1.3,
-              textAlign: 'center',
-              maxWidth: '100%',
-            },
-          },
-          noteText
-        )
-      )
-    );
+    const imageBuffer = await fs.readFile(imagePath);
 
-    const imageResponse = new ImageResponse(tree, {
-      width: 1060,
-      height: 1484,
-      fonts: [
-        {
-          name: 'NotoSansJP',
-          data: fontData,
-          style: 'normal',
-          weight: 700,
-        },
-      ],
-    });
-
-    const arrayBuffer = await imageResponse.arrayBuffer();
-
-    return new Response(arrayBuffer, {
+    return new Response(imageBuffer, {
       headers: {
         'Content-Type': 'image/png',
-        'Content-Length': String(arrayBuffer.byteLength),
+        'Content-Length': String(imageBuffer.byteLength),
         'Cache-Control':
           'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         Pragma: 'no-cache',
@@ -295,11 +36,11 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Unknown topic route error';
+      error instanceof Error ? error.message : 'Unknown fixed png route error';
 
-    console.error('[ito topic] error', message);
+    console.error('[ito topic fixed png] error', message);
 
-    return new Response(`Topic route error: ${message}`, {
+    return new Response(`Fixed PNG route error: ${message}`, {
       status: 500,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
