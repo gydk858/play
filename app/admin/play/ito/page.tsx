@@ -330,98 +330,133 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
             <p style={emptyTextStyle}>まだお題が登録されていません。</p>
           </div>
         ) : (
-          <div style={topicGridStyle}>
+          <div style={accordionListStyle}>
             {topics.map((topic) => (
-              <div key={topic.id} style={topicCardStyle}>
-                <form action={updateTopic} style={topicEditAreaStyle}>
-                  <input type="hidden" name="id" value={topic.id} />
+              <details key={topic.id} style={accordionCardStyle}>
+                <summary style={accordionSummaryStyle}>
+                  <div style={summaryMainStyle}>
+                    <div style={summaryBadgeRowStyle}>
+                      <span style={idBadgeStyle}>ID {topic.id}</span>
+                      <span
+                        style={
+                          topic.is_active ? activeBadgeStyle : inactiveBadgeStyle
+                        }
+                      >
+                        {topic.is_active ? '有効' : '無効'}
+                      </span>
+                    </div>
 
-                  <div style={topicCardTopStyle}>
-                    <div style={idBadgeStyle}>ID {topic.id}</div>
-                    <div
-                      style={
-                        topic.is_active ? activeBadgeStyle : inactiveBadgeStyle
-                      }
-                    >
-                      {topic.is_active ? '有効' : '無効'}
+                    <div style={summaryTitleStyle}>{topic.title}</div>
+
+                    <div style={summaryMetaRowStyle}>
+                      <span style={summaryMetaItemStyle}>
+                        1側: {topic.label_low?.trim() || '未設定'}
+                      </span>
+                      <span style={summaryMetaItemStyle}>
+                        100側: {topic.label_high?.trim() || '未設定'}
+                      </span>
                     </div>
                   </div>
 
-                  <div style={fieldBlockStyle}>
-                    <label htmlFor={`title-${topic.id}`} style={labelStyle}>
-                      お題
-                    </label>
-                    <input
-                      id={`title-${topic.id}`}
-                      name="title"
-                      type="text"
-                      defaultValue={topic.title}
-                      required
-                      style={inputStyle}
+                  <div style={summaryPreviewWrapStyle}>
+                    <img
+                      src={`/play/ito/topic?topic_id=${topic.id}&preview=${previewToken}-${topic.id}`}
+                      alt={`${topic.title} のプレビュー`}
+                      style={summaryPreviewImageStyle}
                     />
+                    <div style={summaryHintStyle}>クリックで編集を開く</div>
                   </div>
+                </summary>
 
-                  <div style={twoColumnStyle}>
-                    <div style={fieldBlockStyle}>
-                      <label
-                        htmlFor={`label-low-${topic.id}`}
-                        style={labelStyle}
-                      >
-                        1側の言葉
-                      </label>
-                      <input
-                        id={`label-low-${topic.id}`}
-                        name="label_low"
-                        type="text"
-                        defaultValue={topic.label_low ?? ''}
-                        style={inputStyle}
+                <div style={accordionBodyStyle}>
+                  <div style={editPreviewGridStyle}>
+                    <form action={updateTopic} style={compactFormStyle}>
+                      <input type="hidden" name="id" value={topic.id} />
+
+                      <div style={fieldBlockStyle}>
+                        <label
+                          htmlFor={`title-${topic.id}`}
+                          style={labelStyle}
+                        >
+                          お題
+                        </label>
+                        <input
+                          id={`title-${topic.id}`}
+                          name="title"
+                          type="text"
+                          defaultValue={topic.title}
+                          required
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <div style={twoColumnStyle}>
+                        <div style={fieldBlockStyle}>
+                          <label
+                            htmlFor={`label-low-${topic.id}`}
+                            style={labelStyle}
+                          >
+                            1側の言葉
+                          </label>
+                          <input
+                            id={`label-low-${topic.id}`}
+                            name="label_low"
+                            type="text"
+                            defaultValue={topic.label_low ?? ''}
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div style={fieldBlockStyle}>
+                          <label
+                            htmlFor={`label-high-${topic.id}`}
+                            style={labelStyle}
+                          >
+                            100側の言葉
+                          </label>
+                          <input
+                            id={`label-high-${topic.id}`}
+                            name="label_high"
+                            type="text"
+                            defaultValue={topic.label_high ?? ''}
+                            style={inputStyle}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={compactBottomRowStyle}>
+                        <label style={checkboxLabelStyle}>
+                          <input
+                            name="is_active"
+                            type="checkbox"
+                            defaultChecked={topic.is_active}
+                          />
+                          有効にする
+                        </label>
+
+                        <div style={topicMetaStyle}>
+                          作成日時: {topic.created_at}
+                        </div>
+                      </div>
+
+                      <div style={buttonRowStyle}>
+                        <button type="submit" style={primaryButtonStyle}>
+                          保存
+                        </button>
+                      </div>
+                    </form>
+
+                    <div style={compactPreviewAreaStyle}>
+                      <div style={previewTitleStyle}>プレビュー</div>
+                      <img
+                        src={`/play/ito/topic?topic_id=${topic.id}&preview=${previewToken}-large-${topic.id}`}
+                        alt={`${topic.title} のプレビュー`}
+                        style={previewImageStyle}
                       />
                     </div>
-
-                    <div style={fieldBlockStyle}>
-                      <label
-                        htmlFor={`label-high-${topic.id}`}
-                        style={labelStyle}
-                      >
-                        100側の言葉
-                      </label>
-                      <input
-                        id={`label-high-${topic.id}`}
-                        name="label_high"
-                        type="text"
-                        defaultValue={topic.label_high ?? ''}
-                        style={inputStyle}
-                      />
-                    </div>
                   </div>
 
-                  <label style={checkboxLabelStyle}>
-                    <input
-                      name="is_active"
-                      type="checkbox"
-                      defaultChecked={topic.is_active}
-                    />
-                    有効にする
-                  </label>
-
-                  <div style={topicMetaStyle}>作成日時: {topic.created_at}</div>
-
-                  <div style={buttonRowStyle}>
-                    <button type="submit" style={primaryButtonStyle}>
-                      保存
-                    </button>
-                  </div>
-                </form>
-
-                <div style={previewAreaStyle}>
-                  <div style={previewTitleStyle}>プレビュー</div>
-                  <img
-                    src={`/play/ito/topic?topic_id=${topic.id}&preview=${previewToken}-${topic.id}`}
-                    alt={`${topic.title} のプレビュー`}
-                    style={previewImageStyle}
-                  />
-
-                  <div style={buttonRowStyle}>
+                  <div style={actionRowStyle}>
                     <form action={toggleTopicActive}>
                       <input type="hidden" name="id" value={topic.id} />
                       <input
@@ -452,7 +487,7 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
                     </form>
                   </div>
                 </div>
-              </div>
+              </details>
             ))}
           </div>
         )}
@@ -764,32 +799,130 @@ const emptyTextStyle: CSSProperties = {
   fontWeight: 600,
 };
 
-const topicGridStyle: CSSProperties = {
-  display: 'grid',
-  gap: '18px',
-};
-
-const topicCardStyle: CSSProperties = {
-  border: '1px solid #d6eaff',
-  borderRadius: '24px',
-  padding: '18px',
-  background: 'linear-gradient(180deg, #ffffff 0%, #f5fbff 100%)',
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 280px',
-  gap: '18px',
-};
-
-const topicEditAreaStyle: CSSProperties = {
+const accordionListStyle: CSSProperties = {
   display: 'grid',
   gap: '14px',
 };
 
-const topicCardTopStyle: CSSProperties = {
+const accordionCardStyle: CSSProperties = {
+  border: '1px solid #d6eaff',
+  borderRadius: '22px',
+  background: 'linear-gradient(180deg, #ffffff 0%, #f6fbff 100%)',
+  boxShadow: '0 10px 22px rgba(120, 160, 210, 0.08)',
+  overflow: 'hidden',
+};
+
+const accordionSummaryStyle: CSSProperties = {
+  listStyle: 'none',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 170px',
+  gap: '16px',
+  padding: '18px',
+  alignItems: 'center',
+  cursor: 'pointer',
+};
+
+const summaryMainStyle: CSSProperties = {
+  display: 'grid',
+  gap: '10px',
+  minWidth: 0,
+};
+
+const summaryBadgeRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+};
+
+const summaryTitleStyle: CSSProperties = {
+  fontSize: '22px',
+  fontWeight: 800,
+  color: '#27476f',
+  lineHeight: 1.4,
+  wordBreak: 'break-word',
+};
+
+const summaryMetaRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '10px',
+  flexWrap: 'wrap',
+};
+
+const summaryMetaItemStyle: CSSProperties = {
+  display: 'inline-block',
+  padding: '6px 10px',
+  borderRadius: '999px',
+  background: '#edf7ff',
+  color: '#4a678f',
+  fontSize: '13px',
+  fontWeight: 600,
+};
+
+const summaryPreviewWrapStyle: CSSProperties = {
+  display: 'grid',
+  gap: '8px',
+  justifyItems: 'center',
+};
+
+const summaryPreviewImageStyle: CSSProperties = {
+  width: '130px',
+  height: 'auto',
+  borderRadius: '12px',
+  border: '1px solid #d6eaff',
+  backgroundColor: '#ffffff',
+  display: 'block',
+};
+
+const summaryHintStyle: CSSProperties = {
+  fontSize: '12px',
+  color: '#6a88ad',
+  fontWeight: 600,
+  textAlign: 'center',
+};
+
+const accordionBodyStyle: CSSProperties = {
+  borderTop: '1px solid #e5f1ff',
+  padding: '18px',
+  display: 'grid',
+  gap: '16px',
+};
+
+const editPreviewGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 220px',
+  gap: '18px',
+  alignItems: 'start',
+};
+
+const compactFormStyle: CSSProperties = {
+  display: 'grid',
+  gap: '14px',
+};
+
+const compactBottomRowStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: '12px',
   flexWrap: 'wrap',
+};
+
+const compactPreviewAreaStyle: CSSProperties = {
+  border: '1px solid #dcecff',
+  borderRadius: '18px',
+  padding: '12px',
+  background: 'linear-gradient(180deg, #fbfeff 0%, #f1f9ff 100%)',
+  display: 'grid',
+  gap: '10px',
+  alignContent: 'start',
+};
+
+const actionRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '10px',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
 };
 
 const idBadgeStyle: CSSProperties = {
@@ -825,16 +958,6 @@ const inactiveBadgeStyle: CSSProperties = {
 const topicMetaStyle: CSSProperties = {
   fontSize: '12px',
   color: '#6a88ad',
-};
-
-const previewAreaStyle: CSSProperties = {
-  border: '1px solid #dcecff',
-  borderRadius: '20px',
-  padding: '14px',
-  background: 'linear-gradient(180deg, #fbfeff 0%, #f1f9ff 100%)',
-  display: 'grid',
-  gap: '12px',
-  alignContent: 'start',
 };
 
 const previewTitleStyle: CSSProperties = {
