@@ -3,6 +3,7 @@ import path from 'path';
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
 import { createElement } from 'react';
+import { uploadPngToStorage, getPublicStorageUrl } from '@/lib/supabase/storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,9 +37,7 @@ function createScaleNote(topic: ItoTopic) {
 function splitTextByLength(text: string, maxCharsPerLine: number) {
   const normalized = text.replace(/\r\n/g, '\n').trim();
 
-  if (!normalized) {
-    return [];
-  }
+  if (!normalized) return [];
 
   const paragraphs = normalized.split('\n');
   const lines: string[] = [];
@@ -72,50 +71,18 @@ function getTitleLayout(title: string) {
   const length = title.replace(/\s+/g, '').length;
 
   if (length <= 8) {
-    return {
-      fontSize: 108,
-      lineHeight: 1.16,
-      maxCharsPerLine: 8,
-    };
+    return { fontSize: 108, lineHeight: 1.16, maxCharsPerLine: 8 };
   }
 
   if (length <= 14) {
-    return {
-      fontSize: 94,
-      lineHeight: 1.18,
-      maxCharsPerLine: 7,
-    };
+    return { fontSize: 94, lineHeight: 1.18, maxCharsPerLine: 7 };
   }
 
   if (length <= 20) {
-    return {
-      fontSize: 78,
-      lineHeight: 1.2,
-      maxCharsPerLine: 6,
-    };
+    return { fontSize: 78, lineHeight: 1.2, maxCharsPerLine: 6 };
   }
 
-  return {
-    fontSize: 66,
-    lineHeight: 1.22,
-    maxCharsPerLine: 6,
-  };
-}
-
-async function getTopicById(topicId: number) {
-  const { data, error } = await supabase
-    .from('ito_topics')
-    .select(
-      'id, title, description, label_low, label_high, is_active, created_at'
-    )
-    .eq('id', topicId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as ItoTopic | null;
+  return { fontSize: 66, lineHeight: 1.22, maxCharsPerLine: 6 };
 }
 
 async function getRandomActiveTopic() {
@@ -138,30 +105,15 @@ async function getRandomActiveTopic() {
   return topics[Math.floor(Math.random() * topics.length)];
 }
 
-export async function GET(request: Request) {
+export async function POST() {
   try {
-    console.log('[ito topic] request', new Date().toISOString(), request.url);
-
-    const url = new URL(request.url);
-    const topicIdParam = url.searchParams.get('topic_id');
-    const topicId = topicIdParam ? Number(topicIdParam) : null;
-
-    let topic: ItoTopic | null = null;
-
-    if (topicId && Number.isFinite(topicId)) {
-      topic = await getTopicById(topicId);
-    } else {
-      topic = await getRandomActiveTopic();
-    }
+    const topic = await getRandomActiveTopic();
 
     if (!topic) {
-      return new Response('Topic not found', {
-        status: 404,
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Cache-Control': 'no-store',
-        },
-      });
+      return Response.json(
+        { ok: false, error: 'No active topics found' },
+        { status: 404 }
+      );
     }
 
     const [fontData, backgroundBuffer] = await Promise.all([
@@ -299,30 +251,21 @@ export async function GET(request: Request) {
     });
 
     const arrayBuffer = await imageResponse.arrayBuffer();
+    const body = new Uint8Array(arrayBuffer);
 
-    return new Response(arrayBuffer, {
-      headers: {
-        'Content-Type': 'image/png',
-        'Content-Length': String(arrayBuffer.byteLength),
-        'Cache-Control':
-          'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-        Pragma: 'no-cache',
-        Expires: '0',
-        'Surrogate-Control': 'no-store',
-      },
+    const storagePath = 'ito/topic/live.png';
+    await uploadPngToStorage(storagePath, body);
+
+    return Response.json({
+      ok: true,
+      topicId: topic.id,
+      storagePath,
+      publicUrl: getPublicStorageUrl(storagePath),
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Unknown topic route error';
+      error instanceof Error ? error.message : 'Unknown sync topic error';
 
-    console.error('[ito topic] error', message);
-
-    return new Response(`Topic route error: ${message}`, {
-      status: 500,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store',
-      },
-    });
+    return Response.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -2,10 +2,11 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getPublicStorageUrl } from '@/lib/supabase/storage';
 import ConfirmSubmitButton from './ConfirmSubmitButton';
 import CopyButton from './CopyButton';
+import SyncImageButton from './SyncImageButton';
 
 type ItoTopic = {
   id: number;
@@ -175,15 +176,8 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
   const status = params.status ?? '';
   const message = params.message ?? '';
 
-  const headerList = await headers();
-  const host = headerList.get('host') ?? 'localhost:3000';
-  const proto =
-    headerList.get('x-forwarded-proto') ??
-    (host.includes('localhost') ? 'http' : 'https');
-
-  const baseUrl = `${proto}://${host}`;
-  const topicUrl = `${baseUrl}/play/ito/topic`;
-  const numberUrl = `${baseUrl}/play/ito/number`;
+  const topicStorageUrl = getPublicStorageUrl('ito/topic/live.png');
+  const numberStorageUrl = getPublicStorageUrl('ito/number/live.png');
 
   const previewToken = Date.now();
 
@@ -235,25 +229,50 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
       <section style={sectionStyle}>
         <h2 style={sectionTitleStyle}>GTA5 印刷機に渡すURL</h2>
         <p style={sectionTextStyle}>
-          下のURLをそのまま使うと、アクセス時にカード画像が返ります。
+          GTA には、Storage に保存された固定 PNG URL を渡します。
         </p>
 
         <div style={urlBlockWrapStyle}>
           <div style={urlCardStyle}>
             <div style={urlLabelStyle}>お題カードURL</div>
             <div style={urlRowStyle}>
-              <div style={urlValueStyle}>{topicUrl}</div>
-              <CopyButton text={topicUrl} />
+              <div style={urlValueStyle}>{topicStorageUrl}</div>
+              <CopyButton text={topicStorageUrl} />
             </div>
           </div>
 
           <div style={urlCardStyle}>
             <div style={urlLabelStyle}>数字カードURL</div>
             <div style={urlRowStyle}>
-              <div style={urlValueStyle}>{numberUrl}</div>
-              <CopyButton text={numberUrl} />
+              <div style={urlValueStyle}>{numberStorageUrl}</div>
+              <CopyButton text={numberStorageUrl} />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <div style={sectionHeaderRowStyle}>
+          <h2 style={sectionTitleStyle}>画像同期</h2>
+        </div>
+
+        <p style={sectionTextStyle}>
+          下のボタンで Storage 上の固定 PNG を再生成します。
+        </p>
+
+        <div style={syncButtonRowStyle}>
+          <SyncImageButton
+            endpoint="/api/sync-ito-topic"
+            label="お題カード画像を再生成"
+            successLabel="お題カード画像を再生成しました。"
+            style={primaryButtonStyle}
+          />
+          <SyncImageButton
+            endpoint="/api/sync-ito-number"
+            label="数字カード画像を再生成"
+            successLabel="数字カード画像を再生成しました。"
+            style={primaryButtonStyle}
+          />
         </div>
       </section>
 
@@ -679,6 +698,13 @@ const urlValueStyle: CSSProperties = {
   color: '#27476f',
   fontWeight: 600,
   lineHeight: 1.8,
+};
+
+const syncButtonRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  flexWrap: 'wrap',
+  marginTop: '16px',
 };
 
 const formGridStyle: CSSProperties = {
