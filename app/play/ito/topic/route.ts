@@ -36,9 +36,7 @@ function createScaleNote(topic: ItoTopic) {
 function splitTextByLength(text: string, maxCharsPerLine: number) {
   const normalized = text.replace(/\r\n/g, '\n').trim();
 
-  if (!normalized) {
-    return [];
-  }
+  if (!normalized) return [];
 
   const paragraphs = normalized.split('\n');
   const lines: string[] = [];
@@ -72,34 +70,18 @@ function getTitleLayout(title: string) {
   const length = title.replace(/\s+/g, '').length;
 
   if (length <= 8) {
-    return {
-      fontSize: 108,
-      lineHeight: 1.16,
-      maxCharsPerLine: 8,
-    };
+    return { fontSize: 108, lineHeight: 1.16, maxCharsPerLine: 8 };
   }
 
   if (length <= 14) {
-    return {
-      fontSize: 94,
-      lineHeight: 1.18,
-      maxCharsPerLine: 7,
-    };
+    return { fontSize: 94, lineHeight: 1.18, maxCharsPerLine: 7 };
   }
 
   if (length <= 20) {
-    return {
-      fontSize: 78,
-      lineHeight: 1.2,
-      maxCharsPerLine: 6,
-    };
+    return { fontSize: 78, lineHeight: 1.2, maxCharsPerLine: 6 };
   }
 
-  return {
-    fontSize: 66,
-    lineHeight: 1.22,
-    maxCharsPerLine: 6,
-  };
+  return { fontSize: 66, lineHeight: 1.22, maxCharsPerLine: 6 };
 }
 
 async function getTopicById(topicId: number) {
@@ -140,6 +122,8 @@ async function getRandomActiveTopic() {
 
 export async function GET(request: Request) {
   try {
+    console.log('[ito topic] request', new Date().toISOString(), request.url);
+
     const url = new URL(request.url);
     const topicIdParam = url.searchParams.get('topic_id');
     const topicId = topicIdParam ? Number(topicIdParam) : null;
@@ -283,7 +267,7 @@ export async function GET(request: Request) {
       )
     );
 
-    return new ImageResponse(tree, {
+    const imageResponse = new ImageResponse(tree, {
       width: 1060,
       height: 1484,
       fonts: [
@@ -294,17 +278,26 @@ export async function GET(request: Request) {
           weight: 700,
         },
       ],
+    });
+
+    const arrayBuffer = await imageResponse.arrayBuffer();
+
+    return new Response(arrayBuffer, {
       headers: {
         'Content-Type': 'image/png',
+        'Content-Length': String(arrayBuffer.byteLength),
         'Cache-Control':
-          'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         Pragma: 'no-cache',
         Expires: '0',
+        'Surrogate-Control': 'no-store',
       },
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown topic route error';
+
+    console.error('[ito topic] error', message);
 
     return new Response(`Topic route error: ${message}`, {
       status: 500,

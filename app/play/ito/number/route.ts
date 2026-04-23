@@ -14,8 +14,10 @@ function getNumberFontSize(number: number) {
   return 540;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    console.log('[ito number] request', new Date().toISOString(), request.url);
+
     const number = Math.floor(Math.random() * 99) + 1;
 
     const [fontData, backgroundBuffer] = await Promise.all([
@@ -86,7 +88,7 @@ export async function GET() {
       )
     );
 
-    return new ImageResponse(tree, {
+    const imageResponse = new ImageResponse(tree, {
       width: 1060,
       height: 1484,
       fonts: [
@@ -97,17 +99,26 @@ export async function GET() {
           weight: 700,
         },
       ],
+    });
+
+    const arrayBuffer = await imageResponse.arrayBuffer();
+
+    return new Response(arrayBuffer, {
       headers: {
         'Content-Type': 'image/png',
+        'Content-Length': String(arrayBuffer.byteLength),
         'Cache-Control':
-          'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         Pragma: 'no-cache',
         Expires: '0',
+        'Surrogate-Control': 'no-store',
       },
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown number route error';
+
+    console.error('[ito number] error', message);
 
     return new Response(`Number route error: ${message}`, {
       status: 500,
