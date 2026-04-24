@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import ConfirmSubmitButton from './ConfirmSubmitButton';
 import CopyButton from './CopyButton';
+import IssueCardButton from './IssueCardButton';
 
 type ItoTopic = {
   id: number;
@@ -15,6 +16,20 @@ type ItoTopic = {
   label_high: string | null;
   is_active: boolean;
   created_at: string;
+};
+
+type ItoIssueState = {
+  card_type: 'topic' | 'number';
+  current_image_path: string;
+  current_image_url: string;
+  image_version: number;
+  image_updated_at: string;
+  current_topic_id: number | null;
+  current_topic_text: string | null;
+  current_number_value: number | null;
+  issued_at: string;
+  created_at: string;
+  updated_at: string;
 };
 
 type PageProps = {
@@ -182,21 +197,33 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
     (host.includes('localhost') ? 'http' : 'https');
 
   const baseUrl = `${proto}://${host}`;
-  const topicUrl = `${baseUrl}/play/ito/topic`;
-  const numberUrl = `${baseUrl}/play/ito/number`;
+  const topicPreviewUrl = `${baseUrl}/play/ito/topic`;
+  const numberPreviewUrl = `${baseUrl}/play/ito/number`;
 
   const previewToken = Date.now();
 
   const supabase = createSupabaseServerClient();
 
-  const { data, error } = await supabase
-    .from('ito_topics')
-    .select(
-      'id, title, description, label_low, label_high, is_active, created_at'
-    )
-    .order('id', { ascending: true });
+  const [{ data: topicsData, error: topicsError }, { data: issueData, error: issueError }] =
+    await Promise.all([
+      supabase
+        .from('ito_topics')
+        .select(
+          'id, title, description, label_low, label_high, is_active, created_at'
+        )
+        .order('id', { ascending: true }),
+      supabase
+        .from('ito_issue_state')
+        .select(
+          'card_type, current_image_path, current_image_url, image_version, image_updated_at, current_topic_id, current_topic_text, current_number_value, issued_at, created_at, updated_at'
+        ),
+    ]);
 
-  const topics = (data ?? []) as ItoTopic[];
+  const topics = (topicsData ?? []) as ItoTopic[];
+  const issueStates = (issueData ?? []) as ItoIssueState[];
+
+  const topicIssue = issueStates.find((item) => item.card_type === 'topic') ?? null;
+  const numberIssue = issueStates.find((item) => item.card_type === 'number') ?? null;
 
   return (
     <main style={pageStyle}>
@@ -233,25 +260,132 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
       ) : null}
 
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>GTA5 印刷機に渡すURL</h2>
+        <h2 style={sectionTitleStyle}>カード発行</h2>
         <p style={sectionTextStyle}>
-          下のURLをそのまま使うと、アクセス時にカード画像が返ります。
+          ボタンを押すたびにランダム内容でカード画像を発行し、GTA に渡すURLを更新します。
+        </p>
+
+        <div style={issueGridStyle}>
+          <div style={issueCardStyle}>
+            <div style={issueCardHeaderStyle}>
+              <h3 style={issueCardTitleStyle}>お題カード発行</h3>
+              <IssueCardButton
+                endpoint="/api/ito/topic/issue"
+                label="お題カードを発行"
+                successMessage="お題カードを発行しました。"
+                style={primaryButtonStyle}
+              />
+            </div>
+
+            {issueError ? (
+              <p style={errorTextStyle}>発行情報の読込エラー: {issueError.message}</p>
+            ) : topicIssue ? (
+              <div style={issueInfoBlockStyle}>
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行済みお題</span>
+                  <span style={issueInfoValueStyle}>
+                    {topicIssue.current_topic_text ?? '未設定'}
+                  </span>
+                </div>
+
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行日時</span>
+                  <span style={issueInfoValueStyle}>{topicIssue.issued_at}</span>
+                </div>
+
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行URL</span>
+                  <div style={urlRowStyle}>
+                    <div style={urlValueStyle}>{topicIssue.current_image_url}</div>
+                    <CopyButton text={topicIssue.current_image_url} />
+                  </div>
+                </div>
+
+                <div style={issuedPreviewWrapStyle}>
+                  <div style={previewTitleStyle}>発行済み画像</div>
+                  <img
+                    src={`${topicIssue.current_image_url}?preview=${previewToken}`}
+                    alt="発行済みお題カード"
+                    style={previewImageStyle}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p style={sectionTextStyle}>まだ発行されていません。</p>
+            )}
+          </div>
+
+          <div style={issueCardStyle}>
+            <div style={issueCardHeaderStyle}>
+              <h3 style={issueCardTitleStyle}>数字カード発行</h3>
+              <IssueCardButton
+                endpoint="/api/ito/number/issue"
+                label="数字カードを発行"
+                successMessage="数字カードを発行しました。"
+                style={primaryButtonStyle}
+              />
+            </div>
+
+            {issueError ? (
+              <p style={errorTextStyle}>発行情報の読込エラー: {issueError.message}</p>
+            ) : numberIssue ? (
+              <div style={issueInfoBlockStyle}>
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行済み数字</span>
+                  <span style={issueInfoValueStyle}>
+                    {numberIssue.current_number_value ?? '未設定'}
+                  </span>
+                </div>
+
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行日時</span>
+                  <span style={issueInfoValueStyle}>{numberIssue.issued_at}</span>
+                </div>
+
+                <div style={issueInfoRowStyle}>
+                  <span style={issueInfoLabelStyle}>発行URL</span>
+                  <div style={urlRowStyle}>
+                    <div style={urlValueStyle}>{numberIssue.current_image_url}</div>
+                    <CopyButton text={numberIssue.current_image_url} />
+                  </div>
+                </div>
+
+                <div style={issuedPreviewWrapStyle}>
+                  <div style={previewTitleStyle}>発行済み画像</div>
+                  <img
+                    src={`${numberIssue.current_image_url}?preview=${previewToken}`}
+                    alt="発行済み数字カード"
+                    style={previewImageStyle}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p style={sectionTextStyle}>まだ発行されていません。</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>開発用プレビューURL</h2>
+        <p style={sectionTextStyle}>
+          下のURLは開発用プレビューです。GTA 本番には発行済みURLを使います。
         </p>
 
         <div style={urlBlockWrapStyle}>
           <div style={urlCardStyle}>
-            <div style={urlLabelStyle}>お題カードURL</div>
+            <div style={urlLabelStyle}>お題カードプレビューURL</div>
             <div style={urlRowStyle}>
-              <div style={urlValueStyle}>{topicUrl}</div>
-              <CopyButton text={topicUrl} />
+              <div style={urlValueStyle}>{topicPreviewUrl}</div>
+              <CopyButton text={topicPreviewUrl} />
             </div>
           </div>
 
           <div style={urlCardStyle}>
-            <div style={urlLabelStyle}>数字カードURL</div>
+            <div style={urlLabelStyle}>数字カードプレビューURL</div>
             <div style={urlRowStyle}>
-              <div style={urlValueStyle}>{numberUrl}</div>
-              <CopyButton text={numberUrl} />
+              <div style={urlValueStyle}>{numberPreviewUrl}</div>
+              <CopyButton text={numberPreviewUrl} />
             </div>
           </div>
         </div>
@@ -322,8 +456,8 @@ export default async function AdminPlayItoPage({ searchParams }: PageProps) {
           <div style={countBadgeStyle}>{topics.length}件</div>
         </div>
 
-        {error ? (
-          <p style={errorTextStyle}>読み込みエラー: {error.message}</p>
+        {topicsError ? (
+          <p style={errorTextStyle}>読み込みエラー: {topicsError.message}</p>
         ) : topics.length === 0 ? (
           <div style={emptyCardStyle}>
             <div style={emptyIconStyle}>🫧</div>
@@ -645,6 +779,65 @@ const sectionTextStyle: CSSProperties = {
   marginBottom: '0',
   lineHeight: 1.8,
   color: '#44607f',
+};
+
+const issueGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: '18px',
+  marginTop: '18px',
+};
+
+const issueCardStyle: CSSProperties = {
+  border: '1px solid #d6eaff',
+  borderRadius: '20px',
+  padding: '18px',
+  background: 'linear-gradient(180deg, #fafdff 0%, #f3faff 100%)',
+  display: 'grid',
+  gap: '14px',
+};
+
+const issueCardHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px',
+  flexWrap: 'wrap',
+};
+
+const issueCardTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '20px',
+  color: '#2d4f82',
+};
+
+const issueInfoBlockStyle: CSSProperties = {
+  display: 'grid',
+  gap: '12px',
+};
+
+const issueInfoRowStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+};
+
+const issueInfoLabelStyle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 700,
+  color: '#2f67c7',
+};
+
+const issueInfoValueStyle: CSSProperties = {
+  color: '#27476f',
+  fontWeight: 600,
+  lineHeight: 1.7,
+  wordBreak: 'break-word',
+};
+
+const issuedPreviewWrapStyle: CSSProperties = {
+  display: 'grid',
+  gap: '10px',
+  marginTop: '4px',
 };
 
 const urlBlockWrapStyle: CSSProperties = {

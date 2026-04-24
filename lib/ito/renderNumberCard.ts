@@ -1,0 +1,98 @@
+import fs from 'fs/promises';
+import path from 'path';
+import { ImageResponse } from 'next/og';
+import { createElement } from 'react';
+
+function getNumberFontSize(number: number) {
+  if (number >= 10) {
+    return 460;
+  }
+
+  return 540;
+}
+
+export async function renderNumberCardPng(number: number) {
+  const [fontData, backgroundBuffer] = await Promise.all([
+    fs.readFile(
+      path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Bold.ttf')
+    ),
+    fs.readFile(
+      path.join(
+        process.cwd(),
+        'public',
+        'play',
+        'ito',
+        'templates',
+        'number-base.png'
+      )
+    ),
+  ]);
+
+  const backgroundBase64 = backgroundBuffer.toString('base64');
+  const fontSize = getNumberFontSize(number);
+
+  const tree = createElement(
+    'div',
+    {
+      style: {
+        width: '1060px',
+        height: '1484px',
+        display: 'flex',
+        position: 'relative',
+        backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
+        backgroundSize: '100% 100%',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+      },
+    },
+    createElement(
+      'div',
+      {
+        style: {
+          position: 'absolute',
+          left: '0',
+          right: '0',
+          top: '260px',
+          height: '520px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+        },
+      },
+      createElement(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#1f2937',
+            fontSize: `${fontSize}px`,
+            fontFamily: 'NotoSansJP',
+            fontWeight: 700,
+            lineHeight: 1,
+            textAlign: 'center',
+          },
+        },
+        String(number)
+      )
+    )
+  );
+
+  const imageResponse = new ImageResponse(tree, {
+    width: 1060,
+    height: 1484,
+    fonts: [
+      {
+        name: 'NotoSansJP',
+        data: fontData,
+        style: 'normal',
+        weight: 700,
+      },
+    ],
+  });
+
+  const arrayBuffer = await imageResponse.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
