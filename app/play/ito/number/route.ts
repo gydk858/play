@@ -1,126 +1,59 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { ImageResponse } from 'next/og';
-import { createElement } from 'react';
+import { renderNumberCardPng } from '@/lib/ito/renderNumberCard';
+import { uploadPngToStorage, getPublicStorageUrl } from '@/lib/supabase/storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function getNumberFontSize(number: number) {
-  if (number >= 10) {
-    return 460;
-  }
+function createVersion() {
+  return Date.now();
+}
 
-  return 540;
+function createSuffix() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function createNumberImagePath(version: number) {
+  const suffix = createSuffix();
+  return `ito/number/redirect_test_${version}_${suffix}.png`;
+}
+
+function getRandomNumber() {
+  return Math.floor(Math.random() * 99) + 1;
 }
 
 export async function GET(request: Request) {
   try {
-    console.log('[ito number] request', new Date().toISOString(), request.url);
+    const number = getRandomNumber();
+    const pngBody = await renderNumberCardPng(number);
 
-    const number = Math.floor(Math.random() * 99) + 1;
+    const version = createVersion();
+    const imagePath = createNumberImagePath(version);
 
-    const [fontData, backgroundBuffer] = await Promise.all([
-      fs.readFile(
-        path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Bold.ttf')
-      ),
-      fs.readFile(
-        path.join(
-          process.cwd(),
-          'public',
-          'play',
-          'ito',
-          'templates',
-          'number-base.png'
-        )
-      ),
-    ]);
+    await uploadPngToStorage(imagePath, pngBody);
 
-    const backgroundBase64 = backgroundBuffer.toString('base64');
-    const fontSize = getNumberFontSize(number);
+    const imageUrl = getPublicStorageUrl(imagePath);
 
-    const tree = createElement(
-      'div',
-      {
-        style: {
-          width: '1060px',
-          height: '1484px',
-          display: 'flex',
-          position: 'relative',
-          backgroundImage: `url(data:image/png;base64,${backgroundBase64})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-        },
-      },
-      createElement(
-        'div',
-        {
-          style: {
-            position: 'absolute',
-            left: '0',
-            right: '0',
-            top: '260px',
-            height: '520px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-          },
-        },
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#1f2937',
-              fontSize: `${fontSize}px`,
-              fontFamily: 'NotoSansJP',
-              fontWeight: 700,
-              lineHeight: 1,
-              textAlign: 'center',
-            },
-          },
-          String(number)
-        )
-      )
+    console.log(
+      `[ito number redirect] number=${number} imageUrl=${imageUrl} request=${request.url}`
     );
 
-    const imageResponse = new ImageResponse(tree, {
-      width: 1060,
-      height: 1484,
-      fonts: [
-        {
-          name: 'NotoSansJP',
-          data: fontData,
-          style: 'normal',
-          weight: 700,
-        },
-      ],
-    });
-
-    const arrayBuffer = await imageResponse.arrayBuffer();
-
-    return new Response(arrayBuffer, {
+    return new Response(null, {
+      status: 302,
       headers: {
-        'Content-Type': 'image/png',
-        'Content-Length': String(arrayBuffer.byteLength),
+        Location: imageUrl,
         'Cache-Control':
           'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         Pragma: 'no-cache',
         Expires: '0',
-        'Surrogate-Control': 'no-store',
       },
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Unknown number route error';
+      error instanceof Error ? error.message : 'Unknown number redirect error';
 
-    console.error('[ito number] error', message);
+    console.error('[ito number redirect] error', message);
 
-    return new Response(`Number route error: ${message}`, {
+    return new Response(`Number redirect error: ${message}`, {
       status: 500,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
